@@ -10,8 +10,10 @@
     "lint-fix": "eslint . --fix"
   },
   "dependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.7",
     "axios": "^1.7.7",
+    "bcrypt": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.487.0",
     "mongoose": "^8.7.0",

@@ -13,6 +13,10 @@
     "jsx": "preserve",
     "incremental": true,
     "moduleDetection": "force",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "plugins": [
       {
         "name": "next"

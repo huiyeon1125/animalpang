@@ -7,7 +7,7 @@ import styled from 'styled-components'
 
 export default function SignUp() {
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('analyst')
 
@@ -17,7 +17,7 @@ export default function SignUp() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, username, password, role }),
     })
 
     if (res.ok) {
@@ -57,7 +57,7 @@ export default function SignUp() {
       </RoleSelect>
 
       <InputField type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
-      <InputField type="email" placeholder="Your Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <InputField type="text" placeholder="Username (ID)" value={username} onChange={(e) => setUsername(e.target.value)} />
       <InputField
         type="password"
         placeholder="Password"

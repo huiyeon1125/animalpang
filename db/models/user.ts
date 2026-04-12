@@ -3,12 +3,11 @@ import mongoose from 'mongoose'
 
 const UserSchema = new mongoose.Schema(
   {
-    email: { type: String, default: '' },
-    nickname: { type: String, default: '' },
-    profile_image_url: { type: String, default: '' },
-    user_type: { type: String, default: '' },
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    name: { type: String, required: true },
+    role: { type: String, default: 'analyst', enum: ['analyst', 'doctor'] },
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
   },
   {
     timestamps: true,

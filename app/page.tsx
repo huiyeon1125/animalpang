@@ -2,6 +2,7 @@
 
 import { ShoppingCart, Menu, Search, Heart, Star, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
   const [cartCount, setCartCount] = useState(0);
@@ -105,6 +106,9 @@ export default function Home() {
                   </span>
                 )}
               </button>
+              <Link href="/auth?type=login" className="text-gray-700 hover:text-indigo-600 transition text-sm font-medium">
+                로그인 / 회원가입
+              </Link>
               <button className="md:hidden p-2">
                 <Menu className="w-5 h-5 text-gray-600" />
               </button>
