@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
-import dbConnect from '../../../db/dbConnect';
-import User from '../../../db/models/user';
+import dbConnect from '@/db/dbConnect';
+import User from '@/db/models/user';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (isPasswordValid) {
-      return NextResponse.json({ message: 'Login successful', user: { username: user.username, name: user.name } }, { status: 200 });
+      return NextResponse.json({ message: 'Login successful', user: { _id: user._id, username: user.username, name: user.name } }, { status: 200 });
     } else {
       return NextResponse.json({ message: 'Invalid password' }, { status: 401 });
     }

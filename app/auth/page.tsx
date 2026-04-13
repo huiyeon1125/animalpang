@@ -19,8 +19,15 @@ function AuthContent() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!username || !password) {
+      setMessage("✗ 아이디와 비밀번호를 입력하세요");
+      return;
+    }
+
+    setIsLoading(true);
     try {
       const res = await fetch("/api/login", {
         method: "POST",
@@ -31,19 +38,33 @@ function AuthContent() {
       });
 
       const data = await res.json();
-      setMessage(data.message);
 
       if (res.ok) {
-        alert("로그인 성공");
-        // Redirect or handle login success
+        setMessage("✓ 로그인 성공했습니다!");
+        // userId를 localStorage에 저장
+        localStorage.setItem("userId", data.user._id || username);
+        // 1.5초 후 상품 목록으로 이동
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1500);
+      } else {
+        setMessage(`✗ ${data.message || "로그인 실패"}`);
       }
     } catch (error) {
       console.error(error);
-      setMessage("에러가 발생했습니다.");
+      setMessage("✗ 에러가 발생했습니다");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSignup = async () => {
+    if (!name || !username || !password) {
+      setMessage("✗ 모든 필드를 입력하세요");
+      return;
+    }
+
+    setIsLoading(true);
     try {
       const res = await fetch("/api/signup", {
         method: "POST",
@@ -54,15 +75,28 @@ function AuthContent() {
       });
 
       const data = await res.json();
-      setMessage(data.message);
 
       if (res.ok) {
-        alert("회원가입 성공");
-        // Redirect to login or handle success
+        setMessage("✓ 회원가입 성공했습니다! 로그인하세요");
+        // userId를 localStorage에 저장
+        if (data.user?._id) {
+          localStorage.setItem("userId", data.user._id);
+        }
+        setTimeout(() => {
+          setName("");
+          setUsername("");
+          setPassword("");
+          setMessage("");
+          window.location.href = "/";
+        }, 1500);
+      } else {
+        setMessage(`✗ ${data.message || "회원가입 실패"}`);
       }
     } catch (error) {
       console.error(error);
-      setMessage("에러가 발생했습니다.");
+      setMessage("✗ 에러가 발생했습니다");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -121,16 +155,21 @@ function AuthContent() {
           </div>
 
           {message && (
-            <div className={`text-sm ${message.includes("성공") ? "text-green-600" : "text-red-600"}`}>
+            <div className={`p-3 rounded-md text-sm text-center font-medium ${
+              message.includes("✓") 
+                ? "bg-green-100 text-green-800" 
+                : "bg-red-100 text-red-800"
+            }`}>
               {message}
             </div>
           )}
 
           <button
             onClick={type === "login" ? handleLogin : handleSignup}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={isLoading}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
           >
-            {type === "login" ? "로그인" : "회원가입"}
+            {isLoading ? (type === "login" ? "로그인 중..." : "가입 중...") : (type === "login" ? "로그인" : "회원가입")}
           </button>
 
           <div className="text-center">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
-import dbConnect from '../../../db/dbConnect';
-import User from '../../../db/models/user';
+import dbConnect from '@/db/dbConnect';
+import User from '@/db/models/user';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     await newUser.save();
 
-    return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
+    return NextResponse.json({ message: 'User created successfully', user: { _id: newUser._id, username: newUser.username } }, { status: 201 });
   } catch (error) {
     console.error('Signup error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
