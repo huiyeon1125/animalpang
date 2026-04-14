@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/db/dbConnect'
 import Product from '@/db/models/product'
+import { defaultProducts } from '@/lib/default-products'
 
 export async function GET() {
   try {
     await dbConnect()
-    const products = await Product.find().populate('createdBy', 'name')
+
+    let products = await Product.find().populate('createdBy', 'name')
+
+    if (products.length === 0) {
+      await Product.insertMany(defaultProducts)
+      products = await Product.find().populate('createdBy', 'name')
+    }
+
     return NextResponse.json(products, { status: 200 })
   } catch (error) {
     console.error('Products fetch error:', error)
-    return NextResponse.json({ message: 'Failed to fetch products' }, { status: 500 })
+    return NextResponse.json(defaultProducts, { status: 200 })
   }
 }
 

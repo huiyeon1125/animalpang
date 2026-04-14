@@ -56,6 +56,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     cart.totalPrice = cart.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0)
     await cart.save()
+    await cart.populate('items.productId')
 
     return NextResponse.json({ message: 'Item added to cart', cart }, { status: 200 })
   } catch (error) {
@@ -86,6 +87,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     cart.totalPrice = cart.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0)
     await cart.save()
+    await cart.populate('items.productId')
 
     return NextResponse.json({ message: 'Cart updated', cart }, { status: 200 })
   } catch (error) {

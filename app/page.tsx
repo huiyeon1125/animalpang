@@ -1,160 +1,266 @@
-"use client";
+﻿"use client";
 
-import { ShoppingCart, Menu, Search, Heart, Star, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
-import Link from 'next/link';
+import Link from "next/link";
+import { ChevronRight, Heart, Menu, Search, ShoppingCart, Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import { defaultProducts } from "@/lib/default-products";
+
+interface Product {
+  _id?: string;
+  name: string;
+  description: string;
+  price: number;
+  image?: string;
+  category: string;
+  stock: number;
+}
+
+const categories = [
+  { name: "강아지 용품", icon: "🐶", color: "bg-blue-50" },
+  { name: "고양이 용품", icon: "🐱", color: "bg-pink-50" },
+  { name: "사료/간식", icon: "🦴", color: "bg-orange-50" },
+  { name: "장난감", icon: "🎾", color: "bg-green-50" },
+];
 
 export default function Home() {
   const [cartCount, setCartCount] = useState(0);
+  const [userName, setUserName] = useState("");
+  const [products, setProducts] = useState<Product[]>(defaultProducts);
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
 
-  const categories = [
-    { name: '강아지 용품', icon: '🐕', color: 'bg-blue-50' },
-    { name: '고양이 용품', icon: '🐈', color: 'bg-pink-50' },
-    { name: '사료/간식', icon: '🍖', color: 'bg-orange-50' },
-    { name: '장난감', icon: '🎾', color: 'bg-green-50' },
-  ];
+  useEffect(() => {
+    const syncClientState = async () => {
+      const savedUserName = localStorage.getItem("userName") || "";
+      const userId = localStorage.getItem("userId");
+      setUserName(savedUserName);
 
-  const products = [
-    {
-      id: 1,
-      name: '프리미엄 강아지 사료',
-      price: 45000,
-      rating: 4.8,
-      reviews: 234,
-      image: 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=400',
-      badge: '인기'
-    },
-    {
-      id: 2,
-      name: '코듀로이 강아지 하네스',
-      price: 28000,
-      rating: 4.9,
-      reviews: 156,
-      image: 'https://images.unsplash.com/photo-1760596687389-93d4fcf1c776?w=400',
-      badge: 'NEW'
-    },
-    {
-      id: 3,
-      name: '고양이 스크래쳐 타워',
-      price: 52000,
-      rating: 4.7,
-      reviews: 189,
-      image: 'https://images.unsplash.com/photo-1545249390-6bdfa286032f?w=400',
-      badge: '베스트'
-    },
-    {
-      id: 4,
-      name: '강아지 장난감 세트',
-      price: 18000,
-      rating: 4.6,
-      reviews: 312,
-      image: 'https://images.unsplash.com/photo-1568640347023-a616a30bc3bd?w=400',
-      badge: '할인'
-    },
-    {
-      id: 5,
-      name: '코기 전용 침대',
-      price: 65000,
-      rating: 4.9,
-      reviews: 98,
-      image: 'https://images.unsplash.com/photo-1760596687491-7b99fb80bb43?w=400',
-      badge: '신상품'
-    },
-    {
-      id: 6,
-      name: '고양이 터널 장난감',
-      price: 22000,
-      rating: 4.8,
-      reviews: 145,
-      image: 'https://images.unsplash.com/photo-1742565850085-bf02c1e7cba4?w=400',
-      badge: '인기'
-    },
-  ];
+      try {
+        const productRes = await fetch("/api/products");
+        const productData = await productRes.json();
 
-  const addToCart = () => {
-    setCartCount(cartCount + 1);
+        if (productRes.ok && Array.isArray(productData) && productData.length > 0) {
+          setProducts(productData.slice(0, 6));
+        } else {
+          setProducts(defaultProducts);
+        }
+      } catch (error) {
+        console.error("Failed to fetch home products:", error);
+        setProducts(defaultProducts);
+      }
+
+      if (!userId) {
+        setCartCount(0);
+        setWishlistIds([]);
+        return;
+      }
+
+      try {
+        const [cartRes, wishlistRes] = await Promise.all([
+          fetch(`/api/cart/${userId}`),
+          fetch(`/api/wishlist/${userId}`),
+        ]);
+
+        const cartData = await cartRes.json();
+        const wishlistData = await wishlistRes.json();
+
+        if (cartRes.ok && cartData?.items) {
+          const itemCount = cartData.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
+          setCartCount(itemCount);
+        }
+
+        if (wishlistRes.ok && wishlistData?.items) {
+          setWishlistIds(
+            wishlistData.items
+              .map((item: { productId?: { _id?: string } }) => item.productId?._id)
+              .filter(Boolean)
+          );
+        }
+      } catch (error) {
+        console.error("Failed to fetch user state:", error);
+      }
+    };
+
+    syncClientState();
+  }, []);
+
+  const handleAddToCart = async (productId?: string) => {
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      alert("먼저 로그인해주세요.");
+      window.location.href = "/auth?type=login";
+      return;
+    }
+
+    if (!productId) {
+      alert("상품 정보를 찾지 못했습니다.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/cart/${userId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId, quantity: 1 }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "장바구니 담기에 실패했습니다.");
+        return;
+      }
+
+      const itemCount = data.cart.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
+      setCartCount(itemCount);
+      alert("장바구니에 담았습니다.");
+    } catch (error) {
+      console.error(error);
+      alert("장바구니 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleToggleWishlist = async (productId?: string) => {
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      alert("먼저 로그인해주세요.");
+      window.location.href = "/auth?type=login";
+      return;
+    }
+
+    if (!productId) {
+      alert("상품 정보를 찾지 못했습니다.");
+      return;
+    }
+
+    const isLiked = wishlistIds.includes(productId);
+
+    try {
+      const res = await fetch(`/api/wishlist/${userId}`, {
+        method: isLiked ? "DELETE" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "찜 처리에 실패했습니다.");
+        return;
+      }
+
+      setWishlistIds(
+        data.wishlist.items
+          .map((item: { productId?: { _id?: string } }) => item.productId?._id)
+          .filter(Boolean)
+      );
+    } catch (error) {
+      console.error("Failed to update wishlist:", error);
+      alert("찜 처리 중 오류가 발생했습니다.");
+    }
   };
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
-              <h1 className="text-2xl font-bold text-indigo-600">🐾 PetMart</h1>
-              <nav className="hidden md:flex gap-6">
-                <a href="#" className="text-gray-700 hover:text-indigo-600 transition">전체상품</a>
-                <a href="#" className="text-gray-700 hover:text-indigo-600 transition">강아지</a>
-                <a href="#" className="text-gray-700 hover:text-indigo-600 transition">고양이</a>
-                <a href="#" className="text-gray-700 hover:text-indigo-600 transition">특가세일</a>
-              </nav>
-            </div>
+      <header className="sticky top-0 z-50 border-b border-gray-200 bg-white">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="text-2xl font-bold text-indigo-600">
+              PetMart
+            </Link>
+            <nav className="hidden gap-6 md:flex">
+              <Link href="/products" className="text-gray-700 transition hover:text-indigo-600">
+                전체상품
+              </Link>
+              <a href="#" className="text-gray-700 transition hover:text-indigo-600">
+                강아지
+              </a>
+              <a href="#" className="text-gray-700 transition hover:text-indigo-600">
+                고양이
+              </a>
+              <a href="#" className="text-gray-700 transition hover:text-indigo-600">
+                이벤트
+              </a>
+            </nav>
+          </div>
 
-            <div className="flex items-center gap-4">
-              <button className="p-2 hover:bg-gray-100 rounded-full transition">
-                <Search className="w-5 h-5 text-gray-600" />
-              </button>
-              <button className="p-2 hover:bg-gray-100 rounded-full transition">
-                <Heart className="w-5 h-5 text-gray-600" />
-              </button>
-              <button className="relative p-2 hover:bg-gray-100 rounded-full transition">
-                <ShoppingCart className="w-5 h-5 text-gray-600" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-              <Link href="/auth?type=login" className="text-gray-700 hover:text-indigo-600 transition text-sm font-medium">
+          <div className="flex items-center gap-4">
+            <button className="rounded-full p-2 transition hover:bg-gray-100">
+              <Search className="h-5 w-5 text-gray-600" />
+            </button>
+            <Link href="/mypage?tab=wishlist" className="relative rounded-full p-2 transition hover:bg-gray-100">
+              <Heart className="h-5 w-5 text-gray-600" />
+              {wishlistIds.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs text-white">
+                  {wishlistIds.length}
+                </span>
+              )}
+            </Link>
+            <Link href="/cart" className="relative rounded-full p-2 transition hover:bg-gray-100">
+              <ShoppingCart className="h-5 w-5 text-gray-600" />
+              {cartCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+            {userName ? (
+              <Link href="/mypage" className="text-sm font-medium text-gray-700 transition hover:text-indigo-600">
+                {userName}
+              </Link>
+            ) : (
+              <Link href="/auth?type=login" className="text-sm font-medium text-gray-700 transition hover:text-indigo-600">
                 로그인 / 회원가입
               </Link>
-              <button className="md:hidden p-2">
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
+            )}
+            <button className="p-2 md:hidden">
+              <Menu className="h-5 w-5 text-gray-600" />
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-indigo-50 to-purple-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-                우리 아이를 위한<br />특별한 선물
-              </h2>
-              <p className="text-xl text-gray-600 mb-8">
-                건강하고 행복한 반려생활을 위한 프리미엄 용품
-              </p>
-              <button className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2">
-                쇼핑 시작하기
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="relative h-96 hidden md:block">
-              <img
-                src="https://images.unsplash.com/photo-1760596687389-93d4fcf1c776?w=600"
-                alt="Happy puppy"
-                className="w-full h-full object-cover rounded-2xl shadow-lg"
-              />
-            </div>
+      <section className="bg-gradient-to-r from-indigo-50 to-sky-50 py-16">
+        <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+          <div>
+            <h1 className="mb-4 text-4xl font-bold text-gray-900 md:text-5xl">
+              우리 아이를 위한
+              <br />
+              특별한 쇼핑
+            </h1>
+            <p className="mb-8 text-xl text-gray-600">
+              반려동물과 함께하는 일상을 더 즐겁게 만드는 인기 상품을 만나보세요.
+            </p>
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-3 text-white transition hover:bg-indigo-700"
+            >
+              쇼핑 시작하기
+              <ChevronRight className="h-5 w-5" />
+            </Link>
+          </div>
+          <div className="relative hidden h-96 md:block">
+            <img
+              src="https://images.unsplash.com/photo-1760596687389-93d4fcf1c776?w=600"
+              alt="Happy puppy"
+              className="h-full w-full rounded-2xl object-cover shadow-lg"
+            />
           </div>
         </div>
       </section>
 
-      {/* Categories */}
-      <section className="py-12 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h3 className="text-2xl font-bold text-gray-900 mb-8">카테고리</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="bg-white py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <h2 className="mb-8 text-2xl font-bold text-gray-900">카테고리</h2>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {categories.map((category) => (
-              <button
-                key={category.name}
-                className={`${category.color} p-6 rounded-xl hover:shadow-md transition`}
-              >
-                <div className="text-4xl mb-2">{category.icon}</div>
+              <button key={category.name} className={`${category.color} rounded-xl p-6 transition hover:shadow-md`}>
+                <div className="mb-2 text-4xl">{category.icon}</div>
                 <div className="font-semibold text-gray-800">{category.name}</div>
               </button>
             ))}
@@ -162,126 +268,70 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Products Grid */}
-      <section className="py-12 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-2xl font-bold text-gray-900">인기 상품</h3>
-            <button className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+      <section className="bg-gray-50 py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">인기 상품</h2>
+            <Link href="/products" className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
               전체보기
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden group">
-                <div className="relative overflow-hidden">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-64 object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <span className="absolute top-3 left-3 bg-indigo-600 text-white px-3 py-1 rounded-full text-sm">
-                    {product.badge}
-                  </span>
-                  <button className="absolute top-3 right-3 p-2 bg-white rounded-full opacity-0 group-hover:opacity-100 transition">
-                    <Heart className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => {
+              const isLiked = !!product._id && wishlistIds.includes(product._id);
 
-                <div className="p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">{product.name}</h4>
-                  <div className="flex items-center gap-1 mb-2">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm text-gray-600">{product.rating}</span>
-                    <span className="text-sm text-gray-400">({product.reviews})</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-gray-900">
-                      {product.price.toLocaleString()}원
+              return (
+                <div key={product._id || product.name} className="group overflow-hidden rounded-xl bg-white shadow-sm transition hover:shadow-lg">
+                  <div className="relative overflow-hidden">
+                    <img
+                      src={product.image || defaultProducts[0].image}
+                      alt={product.name}
+                      className="h-64 w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
+                    <span className="absolute left-3 top-3 rounded-full bg-indigo-600 px-3 py-1 text-sm text-white">
+                      {product.category}
                     </span>
                     <button
-                      onClick={addToCart}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+                      onClick={() => handleToggleWishlist(product._id)}
+                      className="absolute right-3 top-3 rounded-full bg-white p-2 opacity-100 transition hover:scale-105"
                     >
-                      담기
+                      <Heart className={`h-5 w-5 ${isLiked ? "fill-red-500 text-red-500" : "text-gray-600"}`} />
                     </button>
                   </div>
+
+                  <div className="p-4">
+                    <h3 className="mb-2 font-semibold text-gray-900">{product.name}</h3>
+                    <div className="mb-2 flex items-center gap-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm text-gray-600">대표 상품</span>
+                    </div>
+                    <p className="mb-3 line-clamp-2 text-sm text-gray-600">{product.description}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <span className="block text-xl font-bold text-gray-900">
+                          {product.price.toLocaleString()}원
+                        </span>
+                        <span className={`text-sm ${product.stock > 0 ? "text-green-600" : "text-red-500"}`}>
+                          {product.stock > 0 ? `재고 ${product.stock}` : "품절"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleAddToCart(product._id)}
+                        disabled={!product._id || product.stock <= 0}
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        담기
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
-
-      {/* Features */}
-      <section className="py-12 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🚚</span>
-              </div>
-              <h4 className="font-semibold text-gray-900 mb-2">무료배송</h4>
-              <p className="text-gray-600">5만원 이상 구매시 무료배송</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">💝</span>
-              </div>
-              <h4 className="font-semibold text-gray-900 mb-2">첫 구매 혜택</h4>
-              <p className="text-gray-600">신규 회원 15% 할인 쿠폰</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🎁</span>
-              </div>
-              <h4 className="font-semibold text-gray-900 mb-2">적립금</h4>
-              <p className="text-gray-600">구매금액의 5% 적립</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-300 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <h5 className="text-white font-bold mb-4">🐾 PetMart</h5>
-              <p className="text-sm">반려동물과 함께하는 행복한 일상</p>
-            </div>
-            <div>
-              <h6 className="text-white font-semibold mb-4">고객센터</h6>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition">공지사항</a></li>
-                <li><a href="#" className="hover:text-white transition">자주 묻는 질문</a></li>
-                <li><a href="#" className="hover:text-white transition">1:1 문의</a></li>
-              </ul>
-            </div>
-            <div>
-              <h6 className="text-white font-semibold mb-4">쇼핑정보</h6>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition">배송안내</a></li>
-                <li><a href="#" className="hover:text-white transition">교환/반품</a></li>
-                <li><a href="#" className="hover:text-white transition">이용약관</a></li>
-              </ul>
-            </div>
-            <div>
-              <h6 className="text-white font-semibold mb-4">회사정보</h6>
-              <ul className="space-y-2 text-sm">
-                <li>대표: 홍길동</li>
-                <li>사업자번호: 123-45-67890</li>
-                <li>고객센터: 1588-0000</li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 pt-8 text-sm text-center">
-            © 2026 PetMart. All rights reserved.
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

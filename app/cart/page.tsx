@@ -5,7 +5,13 @@ import styled from 'styled-components'
 import Link from 'next/link'
 
 interface CartItem {
-  productId: { _id: string; name: string; price: number }
+  productId: {
+    _id: string
+    name: string
+    price: number
+    image?: string
+    description?: string
+  }
   quantity: number
   price: number
 }
@@ -24,8 +30,8 @@ export default function CartPage() {
   useEffect(() => {
     const id = localStorage.getItem('userId')
     if (!id) {
-      alert('로그인이 필요합니다')
-      window.location.href = '/auth'
+      alert('로그인이 필요합니다.')
+      window.location.href = '/auth?type=login'
       return
     }
 
@@ -40,6 +46,7 @@ export default function CartPage() {
       setCart(data)
     } catch (error) {
       console.error('Failed to fetch cart:', error)
+      alert('장바구니를 불러오지 못했습니다.')
     } finally {
       setLoading(false)
     }
@@ -55,12 +62,16 @@ export default function CartPage() {
         body: JSON.stringify({ productId, quantity: newQuantity }),
       })
 
+      const data = await res.json()
+
       if (res.ok) {
-        const updatedCart = await res.json()
-        setCart(updatedCart.cart)
+        setCart(data.cart)
+      } else {
+        alert(data.message || '수량 변경에 실패했습니다.')
       }
     } catch (error) {
       console.error('Failed to update quantity:', error)
+      alert('수량 변경 중 오류가 발생했습니다.')
     }
   }
 
@@ -71,36 +82,43 @@ export default function CartPage() {
   const handleClearCart = async () => {
     if (!userId) return
 
-    if (confirm('장바구니를 비우시겠습니까?')) {
-      try {
-        const res = await fetch(`/api/cart/${userId}`, {
-          method: 'DELETE',
-        })
+    if (!confirm('장바구니를 비우시겠습니까?')) {
+      return
+    }
 
-        if (res.ok) {
-          setCart(null)
-          alert('✓ 장바구니가 비워졌습니다')
-        }
-      } catch (error) {
-        console.error('Failed to clear cart:', error)
+    try {
+      const res = await fetch(`/api/cart/${userId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setCart({ _id: '', items: [], totalPrice: 0 })
+        alert('장바구니를 비웠습니다.')
+      } else {
+        alert(data.message || '장바구니 비우기에 실패했습니다.')
       }
+    } catch (error) {
+      console.error('Failed to clear cart:', error)
+      alert('장바구니 비우기 중 오류가 발생했습니다.')
     }
   }
 
   if (loading) {
-    return <LoadingText>장바구니를 불러오는 중...</LoadingText>
+    return <LoadingText>장바구니를 불러오는 중입니다...</LoadingText>
   }
 
   if (!cart || cart.items.length === 0) {
     return (
       <Container>
         <Header>
-          <Title>🛒 장바구니</Title>
-          <BackLink href="/products">← 쇼핑 계속하기</BackLink>
+          <Title>장바구니</Title>
+          <BackLink href="/">상품 계속 보기</BackLink>
         </Header>
         <EmptyMessage>
-          장바구니가 비어있습니다
-          <BackLink href="/products">상품 보러가기</BackLink>
+          장바구니가 비어 있습니다.
+          <BackLink href="/">상품 보러가기</BackLink>
         </EmptyMessage>
       </Container>
     )
@@ -109,44 +127,55 @@ export default function CartPage() {
   return (
     <Container>
       <Header>
-        <Title>🛒 장바구니</Title>
-        <BackLink href="/products">← 쇼핑 계속하기</BackLink>
+        <Title>장바구니</Title>
+        <BackLink href="/">상품 계속 보기</BackLink>
       </Header>
 
       <ContentWrapper>
         <CartItemsSection>
-          <SectionTitle>상품 목록 ({cart.items.length}개)</SectionTitle>
+          <SectionTitle>담긴 상품 {cart.items.length}개</SectionTitle>
 
           {cart.items.map((item) => (
             <CartItemCard key={item.productId._id}>
-              <ProductName>{item.productId.name}</ProductName>
-              <ItemDetails>
-                <PriceInfo>
-                  <Label>가격:</Label>
-                  <Price>₩{item.price.toLocaleString()}</Price>
-                </PriceInfo>
+              <Thumbnail $image={item.productId.image} />
+              <ItemBody>
+                <ProductName>{item.productId.name}</ProductName>
+                {item.productId.description && (
+                  <Description>{item.productId.description}</Description>
+                )}
+                <ItemDetails>
+                  <InfoBlock>
+                    <Label>가격</Label>
+                    <Price>{item.price.toLocaleString()}원</Price>
+                  </InfoBlock>
 
-                <QuantityControl>
-                  <Label>수량:</Label>
-                  <QuantityInput
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      handleUpdateQuantity(item.productId._id, parseInt(e.target.value))
-                    }
-                  />
-                </QuantityControl>
+                  <QuantityControl>
+                    <Label>수량</Label>
+                    <QuantityButton
+                      type="button"
+                      onClick={() => handleUpdateQuantity(item.productId._id, Math.max(1, item.quantity - 1))}
+                    >
+                      -
+                    </QuantityButton>
+                    <QuantityValue>{item.quantity}</QuantityValue>
+                    <QuantityButton
+                      type="button"
+                      onClick={() => handleUpdateQuantity(item.productId._id, item.quantity + 1)}
+                    >
+                      +
+                    </QuantityButton>
+                  </QuantityControl>
 
-                <SubtotalInfo>
-                  <Label>소계:</Label>
-                  <Subtotal>₩{(item.price * item.quantity).toLocaleString()}</Subtotal>
-                </SubtotalInfo>
+                  <InfoBlock>
+                    <Label>합계</Label>
+                    <Subtotal>{(item.price * item.quantity).toLocaleString()}원</Subtotal>
+                  </InfoBlock>
 
-                <RemoveButton onClick={() => handleRemoveItem(item.productId._id)}>
-                  ✕ 제거
-                </RemoveButton>
-              </ItemDetails>
+                  <RemoveButton onClick={() => handleRemoveItem(item.productId._id)}>
+                    삭제
+                  </RemoveButton>
+                </ItemDetails>
+              </ItemBody>
             </CartItemCard>
           ))}
         </CartItemsSection>
@@ -155,27 +184,25 @@ export default function CartPage() {
           <SummaryTitle>주문 요약</SummaryTitle>
 
           <SummaryRow>
-            <Label>상품 금액:</Label>
-            <Amount>₩{cart.totalPrice.toLocaleString()}</Amount>
+            <Label>상품 금액</Label>
+            <Amount>{cart.totalPrice.toLocaleString()}원</Amount>
           </SummaryRow>
 
           <SummaryRow>
-            <Label>배송료:</Label>
+            <Label>배송비</Label>
             <Amount>무료</Amount>
           </SummaryRow>
 
           <TotalRow>
-            <Label>총액:</Label>
-            <Total>₩{cart.totalPrice.toLocaleString()}</Total>
+            <Label>총 결제 금액</Label>
+            <Total>{cart.totalPrice.toLocaleString()}원</Total>
           </TotalRow>
 
           <CheckoutButton href={`/checkout?userId=${userId}`}>
-            💳 결제 진행
+            결제 진행하기
           </CheckoutButton>
 
-          <ClearButton onClick={handleClearCart}>
-            🗑️ 장바구니 비우기
-          </ClearButton>
+          <ClearButton onClick={handleClearCart}>장바구니 비우기</ClearButton>
         </SummarySection>
       </ContentWrapper>
     </Container>
@@ -195,6 +222,12 @@ const Header = styled.div`
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 2px solid #e0e0e0;
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 `
 
 const Title = styled.h1`
@@ -203,7 +236,10 @@ const Title = styled.h1`
 `
 
 const BackLink = styled(Link)`
-  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1rem;
   background: #4299e1;
   color: white;
   text-decoration: none;
@@ -217,10 +253,10 @@ const BackLink = styled(Link)`
 
 const ContentWrapper = styled.div`
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr 340px;
   gap: 2rem;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     grid-template-columns: 1fr;
   }
 `
@@ -239,60 +275,60 @@ const SectionTitle = styled.h2`
 `
 
 const CartItemCard = styled.div`
-  padding: 1.5rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   margin-bottom: 1rem;
-  background: #f9f9f9;
+  background: #f8fafc;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `
+
+const Thumbnail = styled.div<{ $image?: string }>`
+  width: 100%;
+  min-height: 120px;
+  border-radius: 10px;
+  background: ${(props) =>
+    props.$image ? `url(${props.$image}) center/cover no-repeat` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
+`
+
+const ItemBody = styled.div``
 
 const ProductName = styled.h3`
   font-size: 1.1rem;
+  margin-bottom: 0.35rem;
+  color: #1a202c;
+`
+
+const Description = styled.p`
+  color: #718096;
   margin-bottom: 1rem;
-  color: #2d3748;
+  line-height: 1.5;
 `
 
 const ItemDetails = styled.div`
   display: flex;
-  gap: 1rem;
   flex-wrap: wrap;
+  gap: 1rem;
   align-items: center;
 `
 
-const PriceInfo = styled.div`
+const InfoBlock = styled.div`
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
-`
-
-const QuantityControl = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-`
-
-const QuantityInput = styled.input`
-  width: 60px;
-  padding: 0.5rem;
-  border: 1px solid #cbd5e0;
-  border-radius: 4px;
-  font-size: 1rem;
-`
-
-const SubtotalInfo = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-`
-
-const Subtotal = styled.span`
-  font-weight: bold;
-  color: #2d3748;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 110px;
 `
 
 const Label = styled.span`
   color: #718096;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.9rem;
 `
 
 const Price = styled.span`
@@ -300,14 +336,46 @@ const Price = styled.span`
   color: #2d3748;
 `
 
+const QuantityControl = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`
+
+const QuantityButton = styled.button`
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #4299e1;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+
+  &:hover {
+    background: #3182ce;
+  }
+`
+
+const QuantityValue = styled.span`
+  min-width: 24px;
+  text-align: center;
+  font-weight: bold;
+  color: #2d3748;
+`
+
+const Subtotal = styled.span`
+  font-weight: bold;
+  color: #2d3748;
+`
+
 const RemoveButton = styled.button`
-  padding: 0.5rem 1rem;
+  padding: 0.7rem 1rem;
   background: #f56565;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s;
 
   &:hover {
     background: #e53e3e;
@@ -345,14 +413,13 @@ const Amount = styled.span`
 const TotalRow = styled(SummaryRow)`
   border-top: 2px solid #e0e0e0;
   padding-top: 1rem;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: bold;
   margin-bottom: 1.5rem;
 `
 
 const Total = styled.span`
   color: #2d3748;
-  font-size: 1.2rem;
 `
 
 const CheckoutButton = styled(Link)`
@@ -365,8 +432,7 @@ const CheckoutButton = styled(Link)`
   text-decoration: none;
   border-radius: 8px;
   font-weight: bold;
-  margin-bottom: 0.5rem;
-  transition: all 0.3s;
+  margin-bottom: 0.75rem;
 
   &:hover {
     background: #38a169;
@@ -375,14 +441,13 @@ const CheckoutButton = styled(Link)`
 
 const ClearButton = styled.button`
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.85rem;
   background: #ed8936;
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
-  transition: all 0.3s;
 
   &:hover {
     background: #dd6b20;
@@ -407,7 +472,7 @@ const EmptyMessage = styled.div`
   font-size: 1rem;
 
   ${BackLink} {
-    display: inline-block;
+    display: inline-flex;
     margin-top: 1.5rem;
   }
 `

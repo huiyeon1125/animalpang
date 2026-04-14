@@ -21,6 +21,19 @@ function AuthContent() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const persistUserSession = (user?: { _id?: string; username?: string; name?: string }) => {
+    if (!user) return;
+
+    if (user._id) {
+      localStorage.setItem("userId", user._id);
+    }
+
+    const displayName = user.name || user.username;
+    if (displayName) {
+      localStorage.setItem("userName", displayName);
+    }
+  };
+
   const handleLogin = async () => {
     if (!username || !password) {
       setMessage("✗ 아이디와 비밀번호를 입력하세요");
@@ -42,7 +55,7 @@ function AuthContent() {
       if (res.ok) {
         setMessage("✓ 로그인 성공했습니다!");
         // userId를 localStorage에 저장
-        localStorage.setItem("userId", data.user._id || username);
+        persistUserSession(data.user);
         // 1.5초 후 상품 목록으로 이동
         setTimeout(() => {
           window.location.href = "/";
@@ -79,9 +92,11 @@ function AuthContent() {
       if (res.ok) {
         setMessage("✓ 회원가입 성공했습니다! 로그인하세요");
         // userId를 localStorage에 저장
-        if (data.user?._id) {
-          localStorage.setItem("userId", data.user._id);
-        }
+        persistUserSession({
+          ...data.user,
+          name,
+          username,
+        });
         setTimeout(() => {
           setName("");
           setUsername("");
